@@ -19,7 +19,13 @@ public class DBConverter {
         db.connectToOracle();
         //db.connectToMongoDB();
         
-        db.generateScript();
+        db.convertToMongoDB();
+        
+        //show the script
+        System.out.println("The script:");
+        db.showStringBuilder();
+        
+        db.saveScript();
         
     }
     
