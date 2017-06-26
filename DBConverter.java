@@ -14,19 +14,7 @@ public class DBConverter {
      * @param args the command line arguments
      */
     public static void main(String[] args) {
-        DBFunctionalities db = new DBFunctionalities();
-        
-        db.connectToOracle();
-        //db.connectToMongoDB();
-        
-        db.convertToMongoDB();
-        
-        //show the script
-        System.out.println("The script:");
-        db.showStringBuilder();
-        
-        db.saveScript();
-        
+        DBFunctionalities dbf = new DBFunctionalities();
+        dbf.convertToMongoDB();
     }
-    
 }
