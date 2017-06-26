@@ -94,29 +94,110 @@ public class DBFunctionalities {
         //initialize the script
         script = new StringBuilder("use test;\n");
 
+        //stabilish connection with the Oracle database
+        Statement stmt = null;
         try {
-
-            //stabilish connection with the Oracle database
-            Statement stmt = connection.createStatement();
-
-            //crate a query in Oracle database
-            String query = "SELECT DISTINCT TABLE_NAME "
-                    + "FROM USER_TAB_COLUMNS "
-                    + "WHERE TABLE_NAME LIKE 'F%' "
-                    + "ORDER BY TABLE_NAME";
-            
-            //create the result set
-            ResultSet rs = stmt.executeQuery(query);
-            
-            rs.next(); //catches the first table name
-            String table_name = rs.getString("TABLE_NAME");
-            System.out.println("Table: " + table_name);
-        
+            stmt = connection.createStatement();
         } catch (SQLException ex) {
-            System.out.println("Unable to access the Oracle database");
-            System.exit(1);
+            System.out.println("Error trying to connect to the Oracle database");
+        }
+
+        //crate a query in Oracle database
+        String query = "SELECT DISTINCT TABLE_NAME "
+                + "FROM USER_TAB_COLUMNS "
+                + "WHERE TABLE_NAME LIKE 'F%' "
+                + "ORDER BY TABLE_NAME";
+            
+        //create the result set
+        ResultSet rs = null;
+        try {
+            rs = stmt.executeQuery(query);
+        } catch (SQLException ex) {
+            System.out.println("Error trying to create query statement");
+        }
+            
+        script.append("db.");
+            
+        try {
+            rs.next(); //catches the first table name
+        } catch (SQLException ex) {
+            System.out.println("Error trying to read the first query result set");
         }
         
+        String tableName = null;
+        try {
+            tableName = rs.getString("TABLE_NAME");
+        } catch (SQLException ex) {
+            System.out.println("Error trying to get table name");
+        }
+        script.append(tableName).append(".insert({id:{");
+            
+        //inner iteration (tuples)
+        Statement innerStmt = null;
+        try {
+            innerStmt = connection.createStatement();
+        } catch (SQLException ex) {
+            System.out.println("Error trying to create inner statement"); 
+        }
+        
+        String innerQuery = "SELECT * FROM " + tableName;
+        
+        ResultSet innerRS = null;
+        try {
+            innerRS = innerStmt.executeQuery(innerQuery);
+        } catch (SQLException ex) {
+            System.out.println("Error trying to create inner result set"); 
+        }
+        
+        ResultSetMetaData rsmd = null;
+        try {
+            rsmd = innerRS.getMetaData();
+        } catch (SQLException ex) {
+            System.out.println("Error trying to create inner metadata result set"); 
+        }
+            
+        int count = 0;  //columns counter
+        count++;
+
+        String columnName = null;
+        try {
+            innerRS.next();
+        } catch (SQLException ex) {
+            System.out.println("Error in iterator");
+        }
+        
+        try {
+            columnName = rsmd.getColumnName(count);
+        } catch (SQLException ex) {
+            System.out.println("Error trying to get the column name");
+        }
+        script.append(columnName).append(":'");
+          
+        String data = "";
+        try {
+            data = innerRS.getString(columnName);
+        } catch (SQLException ex) {
+            System.out.println("Error trying to get data");
+        }
+        script.append(data).append("', ");
+           
+        count++;
+        try {
+            columnName = rsmd.getColumnName(count);
+        } catch (SQLException ex) {
+            System.out.println("Error trying to get the column name");        }
+        script.append(columnName).append(":'");
+            
+        try {
+            data = innerRS.getString(columnName);
+        } catch (SQLException ex) {
+            System.out.println("Error trying to get data");
+        }
+        script.append(data).append("'}");
+            
+        //end
+        script.append("});\n");
+            
         //showing script
         showScript();
         
