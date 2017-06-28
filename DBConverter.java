@@ -4,6 +4,8 @@
  */
 package DBConverter;
 
+import java.sql.SQLException;
+
 /**
  * DBConverter main class for the DBConverter Project
  * @author hamilton
@@ -13,7 +15,7 @@ public class DBConverter {
     /**
      * @param args the command line arguments
      */
-    public static void main(String[] args) {
+    public static void main(String[] args) throws SQLException {
         DBFunctionalities dbf = new DBFunctionalities();
         dbf.convertToMongoDB();
     }
