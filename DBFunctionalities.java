@@ -118,8 +118,14 @@ public class DBFunctionalities {
         totalColumns = rsmd.getColumnCount();
 
         while (columnRS.next()) {
+
             scriptPiece = "db." + tableName + ".insert({_id:{";
             column = 1;
+
+            int pk = pkStatus(tableName);
+            scriptPiece = "db." + tableName + ".insert({_id:{";
+            column = 1;
+
             columnName = rsmd.getColumnName(column).toLowerCase();
             scriptPiece += columnName + ":";
 
@@ -129,6 +135,10 @@ public class DBFunctionalities {
                 scriptPiece += Integer.toString(columnRS.getInt(column));
             } else if (isDate(rsmd, column)) {
                 scriptPiece += "'" + columnRS.getDate(column).toString() + "'";
+            }
+
+            if (--pk == 0) {
+                scriptPiece += "}";
             }
 
             for (column = 2; column <= totalColumns; column++) {
@@ -141,6 +151,10 @@ public class DBFunctionalities {
                     scriptPiece += Integer.toString(columnRS.getInt(column));
                 } else if (isDate(rsmd, column)) {
                     scriptPiece += "'" + columnRS.getDate(column).toString() + "'";
+                }
+
+                if (--pk == 0) {
+                    scriptPiece += "}";
                 }
 
             }
@@ -196,32 +210,50 @@ public class DBFunctionalities {
         return result;
     }
 
-    public ResultSet resultSetPKTest(String tableName) {
+    public int pkStatus(String tableName) {
         ResultSet rs = null;
-        String query = "SELECT POSITION FROM USER_CONS_COLUMNS "
+        String query = "SELECT MAX(POSITION) AS MAXIMO FROM USER_CONS_COLUMNS "
                 + "WHERE TABLE_NAME LIKE 'F%' AND CONSTRAINT_NAME LIKE 'PK%' "
-                + "AND TABLE_NAME = '" + tableName + "' AND POSITION = 2";
+                + "AND TABLE_NAME = 'F01_ESTADO' "
+                + "GROUP BY TABLE_NAME";
+
         try {
             rs = connection.createStatement().executeQuery(query);
         } catch (SQLException ex) {
             System.out.println("Error trying to get primary key result set");
         }
 
-        return rs;
+        int position = 0;
+        try {
+            rs.next();
+            position = rs.getInt("MAXIMO");
+        } catch (SQLException ex) {
+            System.out.println("Error trying to get key type");
+        }
+
+        return position;
     }
 
-    public ResultSet resultSetFKTest(String tableName) {
+    public int fkStatus(String tableName) {
         ResultSet rs = null;
-        String query = "SELECT POSITION FROM USER_CONS_COLUMNS "
+        String query = "SELECT MAX(POSITION) FROM USER_CONS_COLUMNS "
                 + "WHERE TABLE_NAME LIKE 'F%' AND CONSTRAINT_NAME LIKE 'FK%' "
-                + "AND TABLE_NAME = '" + tableName + "' AND POSITION = 2";
+                + "AND TABLE_NAME = '" + tableName + "' "
+                + "GROUP BY TABLE_NAME";
         try {
             rs = connection.createStatement().executeQuery(query);
         } catch (SQLException ex) {
-            System.out.println("Error trying to get foreign key result set");
+            System.out.println("Error trying to get primary key result set");
         }
 
-        return rs;
+        int position = 0;
+        try {
+            position = rs.getInt("MAX(POSITION)");
+        } catch (SQLException ex) {
+            System.out.println("Error trying to get key type");
+        }
+
+        return position;
     }
 
     boolean isVarchar(ResultSetMetaData rsmd, int column) {
@@ -262,28 +294,6 @@ public class DBFunctionalities {
             System.out.println("Error trying to get column type");
         }
         return (type == Types.DATE);
-    }
-
-    public boolean isSimpleKey(ResultSet rs) {
-        int position = 0;
-        try {
-            position = rs.getInt("POSITION");
-        } catch (SQLException ex) {
-            System.out.println("Error trying to get key type");
-        }
-
-        return (position != 2);
-    }
-
-    public boolean isForeignKey(ResultSet rs) {
-        int position = 0;
-        try {
-            position = rs.getInt("POSITION");
-        } catch (SQLException ex) {
-            System.out.println("Error trying to get key type");
-        }
-
-        return (position == 2);
     }
 
     public String getForeignKeyConstraintName(ResultSetMetaData rs, int column) {
