@@ -18,5 +18,7 @@ public class DBConverter {
     public static void main(String[] args) throws SQLException {
         DBFunctionalities dbf = new DBFunctionalities();
         dbf.convertToMongoDB();
+        dbf.showScript();
+        dbf.saveScript();
     }
 }
