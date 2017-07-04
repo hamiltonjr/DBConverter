@@ -53,9 +53,9 @@ public class DBFunctionalities {
     StringBuilder script;
 
     //Result sets
-    ResultSet rs = null;
-    ResultSet columnRS = null;
-    ResultSetMetaData rsmd = null;
+    ResultSet table = null;
+    ResultSet tuple = null;
+    ResultSetMetaData metadata = null;
 
     //constructor
     public DBFunctionalities() {
@@ -65,7 +65,7 @@ public class DBFunctionalities {
         //connectToMongoDB();
 
         //initial piece of the script
-        script = new StringBuilder("use test;\n");
+        script = new StringBuilder("use FUT;\n");
 
     }
 
@@ -102,112 +102,29 @@ public class DBFunctionalities {
 
     public void convertToMongoDB() throws SQLException {
 
-        rs = resultSetTable();
-
         String tableName = null;
-        String scriptPiece = null;
-        String columnName = null;
-        int totalColumns = 0;
-        int column = 0;
+        String query = null;
 
-        rs.next();
-        tableName = rs.getString("TABLE_NAME");
+        query = "SELECT TABLE_NAME FROM USER_TABLES "
+                + "WHERE TABLE_NAME LIKE 'F%'";
+        table = connection.createStatement().executeQuery(query);
 
-        columnRS = resultSetColumns(tableName);
-        rsmd = resultSetMetaData();
-        totalColumns = rsmd.getColumnCount();
-
-        while (columnRS.next()) {
-
-            scriptPiece = "db." + tableName + ".insert({_id:{";
-            column = 1;
-
-            int pk = pkStatus(tableName);
-            scriptPiece = "db." + tableName + ".insert({_id:{";
-            column = 1;
-
-            columnName = rsmd.getColumnName(column).toLowerCase();
-            scriptPiece += columnName + ":";
-
-            if (isChar(rsmd, column) || isVarchar(rsmd, column)) {
-                scriptPiece += "'" + columnRS.getString(column) + "'";
-            } else if (isNumber(rsmd, column)) {
-                scriptPiece += Integer.toString(columnRS.getInt(column));
-            } else if (isDate(rsmd, column)) {
-                scriptPiece += "'" + columnRS.getDate(column).toString() + "'";
-            }
-
-            if (--pk == 0) {
-                scriptPiece += "}";
-            }
-
-            for (column = 2; column <= totalColumns; column++) {
-                columnName = rsmd.getColumnName(column).toLowerCase();
-                scriptPiece += ", " + columnName + ":";
-
-                if (isChar(rsmd, column) || isVarchar(rsmd, column)) {
-                    scriptPiece += "'" + columnRS.getString(column) + "'";
-                } else if (isNumber(rsmd, column)) {
-                    scriptPiece += Integer.toString(columnRS.getInt(column));
-                } else if (isDate(rsmd, column)) {
-                    scriptPiece += "'" + columnRS.getDate(column).toString() + "'";
+        while (table.next()) {
+            tableName = table.getString("TABLE_NAME");
+            System.out.println("#-" + tableName + "-#");
+            query = "SELECT * FROM " + tableName;
+            tuple = connection.createStatement().executeQuery(query);
+            metadata = tuple.getMetaData();
+            while (tuple.next()) {
+                int column;
+                for (column = 1; column < metadata.getColumnCount(); column++) {
+                    System.out.print(metadata.getColumnName(column).toLowerCase() + ":");
+                    System.out.print(tuple.getString(column) + ", ");
                 }
-
-                if (--pk == 0) {
-                    scriptPiece += "}";
-                }
-
+                System.out.print(metadata.getColumnName(column).toLowerCase() + ":");
+                System.out.println(tuple.getString(column));
             }
-
-            scriptPiece += "});\n";
-            script.append(scriptPiece);
-
         }
-
-        showScript();
-
-    }
-
-    public ResultSet resultSetTable() {
-
-        //crate a query in Oracle database
-        String query = "SELECT DISTINCT TABLE_NAME FROM USER_TAB_COLUMNS "
-                + "WHERE TABLE_NAME LIKE 'F%' ORDER BY TABLE_NAME";
-
-        ResultSet result = null;
-        try {
-            result = connection.createStatement().executeQuery(query);
-        } catch (SQLException ex) {
-            System.out.println("Error trying to create query statement");
-        }
-
-        return result;
-    }
-
-    public ResultSet resultSetColumns(String tableName) {
-
-        //inner iteration: gets the table columns
-        String query = "SELECT * FROM " + tableName;
-
-        ResultSet result = null;
-        try {
-            result = connection.createStatement().executeQuery(query);
-        } catch (SQLException ex) {
-            System.out.println("Error trying to get column result set");
-        }
-
-        return result;
-    }
-
-    public ResultSetMetaData resultSetMetaData() {
-        ResultSetMetaData result = null;
-        try {
-            result = columnRS.getMetaData();
-        } catch (SQLException ex) {
-            System.out.println("Error trying to create metadata result set");
-        }
-
-        return result;
     }
 
     public int pkStatus(String tableName) {
@@ -256,48 +173,44 @@ public class DBFunctionalities {
         return position;
     }
 
-    boolean isVarchar(ResultSetMetaData rsmd, int column) {
+    boolean isVarchar(ResultSetMetaData md, int column) {
         int type = 0;
         try {
-            type = rsmd.getColumnType(column);
+            type = md.getColumnType(column);
         } catch (SQLException ex) {
             System.out.println("Error trying to get column type");
         }
         return (type == Types.VARCHAR);
     }
 
-    boolean isChar(ResultSetMetaData rsmd, int column) {
+    boolean isChar(ResultSetMetaData md, int column) {
         int type = 0;
         try {
-            type = rsmd.getColumnType(column);
+            type = md.getColumnType(column);
         } catch (SQLException ex) {
             System.out.println("Error trying to get column type");
         }
         return (type == Types.CHAR);
     }
 
-    boolean isNumber(ResultSetMetaData rsmd, int column) {
+    boolean isNumber(ResultSetMetaData md, int column) {
         int type = 0;
         try {
-            type = rsmd.getColumnType(column);
+            type = md.getColumnType(column);
         } catch (SQLException ex) {
             System.out.println("Error trying to get column type");
         }
         return (type == Types.INTEGER);
     }
 
-    boolean isDate(ResultSetMetaData rsmd, int column) {
+    boolean isDate(ResultSetMetaData md, int column) {
         int type = 0;
         try {
-            type = rsmd.getColumnType(column);
+            type = md.getColumnType(column);
         } catch (SQLException ex) {
             System.out.println("Error trying to get column type");
         }
         return (type == Types.DATE);
-    }
-
-    public String getForeignKeyConstraintName(ResultSetMetaData rs, int column) {
-        return "";
     }
 
     public void showScript() {
