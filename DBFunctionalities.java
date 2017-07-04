@@ -110,25 +110,31 @@ public class DBFunctionalities {
         table = connection.createStatement().executeQuery(query);
 
         while (table.next()) {
-            String scriptPiece = "";
             tableName = table.getString("TABLE_NAME");
-            script.append("#-" + tableName + "-#\n");
+            String scriptPiece = "";
 
             query = "SELECT * FROM " + tableName;
             tuple = connection.createStatement().executeQuery(query);
             metadata = tuple.getMetaData();
+
             while (tuple.next()) {
-                int column;
-                for (column = 1; column < metadata.getColumnCount(); column++) {
+                int column = 1;
+                scriptPiece += "db." + tableName + ".insert({_id:{";
+                scriptPiece += metadata.getColumnName(column).toLowerCase() + ":";
+                scriptPiece += tuple.getString(column) + "}, ";
+                
+                for (column = 2; column < metadata.getColumnCount(); column++) {
                     scriptPiece += metadata.getColumnName(column).toLowerCase() + ":";
                     scriptPiece += tuple.getString(column) + ", ";
                 }
+                
                 scriptPiece += metadata.getColumnName(column).toLowerCase() + ":";
-                scriptPiece += tuple.getString(column) + "\n";
+                scriptPiece += tuple.getString(column) + "}\n";
+            
             }
             script.append(scriptPiece);
         }
-        
+
     }
 
     public int pkStatus(String tableName) {
