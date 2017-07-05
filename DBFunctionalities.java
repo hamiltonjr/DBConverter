@@ -116,32 +116,76 @@ public class DBFunctionalities {
             query = "SELECT * FROM " + tableName;
             tuple = connection.createStatement().executeQuery(query);
             metadata = tuple.getMetaData();
+            int pk = pkStatus(tableName);
 
+            //iterate in tuples
             while (tuple.next()) {
                 int column = 1;
-                scriptPiece += "db." + tableName + ".insert({_id:{";
-                scriptPiece += metadata.getColumnName(column).toLowerCase() + ":";
-                scriptPiece += tuple.getString(column) + "}, ";
-                
-                for (column = 2; column < metadata.getColumnCount(); column++) {
-                    scriptPiece += metadata.getColumnName(column).toLowerCase() + ":";
-                    scriptPiece += tuple.getString(column) + ", ";
-                }
-                
-                scriptPiece += metadata.getColumnName(column).toLowerCase() + ":";
-                scriptPiece += tuple.getString(column) + "}\n";
-            
-            }
-            script.append(scriptPiece);
-        }
+                int currentColumn = 0;
 
+                //maximum index of columns
+                int count = metadata.getColumnCount();
+
+                //initialize script piece
+                scriptPiece += "db." + tableName + ".insert({_id:{";
+
+                //first column always present
+                scriptPiece += metadata.getColumnName(1).toLowerCase() + ":";
+                scriptPiece += tuple.getString(1);
+                currentColumn = 1;
+
+                //if primary key is compound
+                if (pk == 2) {
+                    //ṕut second column
+                    scriptPiece += ", ";
+                    scriptPiece += metadata.getColumnName(2).toLowerCase() + ":";
+                    scriptPiece += tuple.getString(2);
+                    scriptPiece += "}"; //always close
+                    currentColumn = 2;
+                } else {
+                    scriptPiece += "}"; //pk == 1 closeand continue
+                }
+
+                currentColumn++;
+                if (count > 3) {
+                    for (column = currentColumn; column < count; column++) {
+                        scriptPiece += ", " + metadata.getColumnName(column).toLowerCase() + ":";
+                        scriptPiece += tuple.getString(column);
+                    }
+
+                    //last column
+                    scriptPiece += ", " + metadata.getColumnName(count).toLowerCase() + ":";
+                    scriptPiece += tuple.getString(count) + "}";
+
+                } else if (count == 3) {
+                    if (pk == 1) {
+                        for (column = currentColumn; column < count; column++) {
+                            scriptPiece += ", " + metadata.getColumnName(column).toLowerCase() + ":";
+                            scriptPiece += tuple.getString(column);
+                        }
+                    }
+
+                    //last column
+                    scriptPiece += ", " + metadata.getColumnName(count).toLowerCase() + ":";
+                    scriptPiece += tuple.getString(count) + "}";
+                } else if (pk == 1) {
+                    //last column
+                    scriptPiece += ", " + metadata.getColumnName(count).toLowerCase() + ":";
+                    scriptPiece += tuple.getString(count) + "}";
+                }
+
+                scriptPiece += ");\n";
+            } //end of tuple iteration
+
+            script.append(scriptPiece);
+        } //end of table iteration
     }
 
     public int pkStatus(String tableName) {
         ResultSet rs = null;
         String query = "SELECT MAX(POSITION) AS MAXIMO FROM USER_CONS_COLUMNS "
                 + "WHERE TABLE_NAME LIKE 'F%' AND CONSTRAINT_NAME LIKE 'PK%' "
-                + "AND TABLE_NAME = 'F01_ESTADO' "
+                + "AND TABLE_NAME = '" + tableName + "' "
                 + "GROUP BY TABLE_NAME";
 
         try {
