@@ -129,9 +129,27 @@ public class DBFunctionalities {
                 //initialize script piece
                 scriptPiece += "db." + tableName + ".insert({_id:{";
 
+                boolean hasBlob = false;
+                boolean hasQM = false;
+                boolean a, b, c, d, n;
+
                 //first column always present
                 scriptPiece += metadata.getColumnName(1).toLowerCase() + ":";
-                scriptPiece += tuple.getString(1);
+                a = metadata.getColumnType(1) == Types.VARCHAR;
+                b = metadata.getColumnType(1) == Types.BLOB;
+                c = metadata.getColumnType(1) == Types.CHAR;
+                d = metadata.getColumnType(1) == Types.DATE;
+                n = metadata.getColumnType(1) == Types.NUMERIC;
+
+                hasQM = a || c || d; //has quotation mark
+                hasBlob = b;
+
+                String data = tuple.getString(1);
+                if (hasQM) {
+                    data = "'" + data + "'";
+                }
+
+                scriptPiece += data;
                 currentColumn = 1;
 
                 //if primary key is compound
@@ -139,7 +157,20 @@ public class DBFunctionalities {
                     //ṕut second column
                     scriptPiece += ", ";
                     scriptPiece += metadata.getColumnName(2).toLowerCase() + ":";
-                    scriptPiece += tuple.getString(2);
+                    a = metadata.getColumnType(2) == Types.VARCHAR;
+                    b = metadata.getColumnType(2) == Types.BLOB;
+                    c = metadata.getColumnType(2) == Types.CHAR;
+                    d = metadata.getColumnType(2) == Types.DATE;
+                    n = metadata.getColumnType(2) == Types.NUMERIC;
+
+                    hasQM = a || c || d; //has quotation mark
+                    hasBlob = hasBlob || b;
+
+                    data = tuple.getString(2);
+                    if (hasQM) {
+                        data = "'" + data + "'";
+                    }
+                    scriptPiece += data;
                     scriptPiece += "}"; //always close
                     currentColumn = 2;
                 } else {
@@ -150,31 +181,100 @@ public class DBFunctionalities {
                 if (count > 3) {
                     for (column = currentColumn; column < count; column++) {
                         scriptPiece += ", " + metadata.getColumnName(column).toLowerCase() + ":";
-                        scriptPiece += tuple.getString(column);
+                        a = metadata.getColumnType(column) == Types.VARCHAR;
+                        b = metadata.getColumnType(column) == Types.BLOB;
+                        c = metadata.getColumnType(column) == Types.CHAR;
+                        d = metadata.getColumnType(column) == Types.DATE;
+                        n = metadata.getColumnType(column) == Types.NUMERIC;
+
+                        hasQM = a || c || d; //has quotation mark
+                        hasBlob = hasBlob || b;
+
+                        data = tuple.getString(column);
+                        if (hasQM) {
+                            data = "'" + data + "'";
+                        }
+                        scriptPiece += data;
                     }
 
                     //last column
                     scriptPiece += ", " + metadata.getColumnName(count).toLowerCase() + ":";
-                    scriptPiece += tuple.getString(count) + "}";
+                    a = metadata.getColumnType(count) == Types.VARCHAR;
+                    b = metadata.getColumnType(count) == Types.BLOB;
+                    c = metadata.getColumnType(count) == Types.CHAR;
+                    d = metadata.getColumnType(count) == Types.DATE;
+                    n = metadata.getColumnType(count) == Types.NUMERIC;
+
+                    hasQM = a || c || d; //has quotation mark
+                    hasBlob = hasBlob || b;
+
+                    data = tuple.getString(count);
+                    if (hasQM) {
+                        data = "'" + data + "'";
+                    }
+                    scriptPiece += data + "}";
 
                 } else if (count == 3) {
                     if (pk == 1) {
                         for (column = currentColumn; column < count; column++) {
                             scriptPiece += ", " + metadata.getColumnName(column).toLowerCase() + ":";
-                            scriptPiece += tuple.getString(column);
+                            a = metadata.getColumnType(column) == Types.VARCHAR;
+                            b = metadata.getColumnType(column) == Types.BLOB;
+                            c = metadata.getColumnType(column) == Types.CHAR;
+                            d = metadata.getColumnType(column) == Types.DATE;
+                            n = metadata.getColumnType(column) == Types.NUMERIC;
+
+                            hasQM = a || c || d; //has quotation mark
+                            hasBlob = hasBlob || b;
+
+                            data = tuple.getString(column);
+                            if (hasQM) {
+                                data = "'" + data + "'";
+                            }
+                            scriptPiece += data;
                         }
                     }
 
                     //last column
                     scriptPiece += ", " + metadata.getColumnName(count).toLowerCase() + ":";
-                    scriptPiece += tuple.getString(count) + "}";
+                    a = metadata.getColumnType(count) == Types.VARCHAR;
+                    b = metadata.getColumnType(count) == Types.BLOB;
+                    c = metadata.getColumnType(count) == Types.CHAR;
+                    d = metadata.getColumnType(count) == Types.DATE;
+                    n = metadata.getColumnType(count) == Types.NUMERIC;
+
+                    hasQM = a || c || d; //has quotation mark
+                    hasBlob = hasBlob || b;
+
+                    data = tuple.getString(count);
+                    if (hasQM) {
+                        data = "'" + data + "'";
+                    }
+                    scriptPiece += data + "}";
+
                 } else if (pk == 1) {
                     //last column
                     scriptPiece += ", " + metadata.getColumnName(count).toLowerCase() + ":";
-                    scriptPiece += tuple.getString(count) + "}";
+                    a = metadata.getColumnType(count) == Types.VARCHAR;
+                    b = metadata.getColumnType(count) == Types.BLOB;
+                    c = metadata.getColumnType(count) == Types.CHAR;
+                    d = metadata.getColumnType(count) == Types.DATE;
+                    n = metadata.getColumnType(count) == Types.NUMERIC;
+
+                    hasQM = a || c || d; //has quotation mark
+                    hasBlob = hasBlob || b;
+
+                    data = tuple.getString(count);
+                    if (hasQM) {
+                        data = "'" + data + "'";
+                    }
+                    scriptPiece += data + "}";
                 }
 
                 scriptPiece += ");\n";
+                if (hasBlob) {
+                    scriptPiece += "//BLOB detected and no implemented!\n";
+                }
             } //end of tuple iteration
 
             script.append(scriptPiece);
