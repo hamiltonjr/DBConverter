@@ -1,6 +1,9 @@
 /*
  * This code implements a simplified Oracle to MongoDB Database Converter
  * Itis part of Database Lab discipline assessment 1st semester 2017
+ *
+ * A script is generated. The same database is directly generated in the 
+ * MongoDB dbms.
  */
 package DBConverter;
 
@@ -34,7 +37,7 @@ import java.sql.Types;
  */
 public class DBFunctionalities {
 
-    //constatnts for the drivers and connections
+    //constatnts for drivers and connections
     static final String JDBC_ORACLE_DRIVER = "oracle.jdbc.driver.OracleDriver";
     static final String ORACLE_URL = "jdbc:oracle:thin:@grad.icmc.usp.br:15215:orcl";
     static final String USERNAME = "teste";
@@ -69,6 +72,9 @@ public class DBFunctionalities {
 
     }
 
+    /**
+     * This method connects to the Oracle database
+     */
     private void connectToOracle() {
 
         //connecting with Oracle database
@@ -87,6 +93,9 @@ public class DBFunctionalities {
         }
     }
 
+    /**
+     * This method connects to MongoDB
+     */
     private void connectToMongoDB() {
         //connecting with MongoDB
         try {
@@ -100,23 +109,34 @@ public class DBFunctionalities {
         }
     }
 
+    /**
+     * This method do the conversion of Oracle database to the same database
+     * in MongoDB.
+     * @throws SQLException 
+     */
     public void convertToMongoDB() throws SQLException {
 
+        //do the table manes query
         String tableName = null;
         String query = null;
-
         query = "SELECT TABLE_NAME FROM USER_TABLES "
                 + "WHERE TABLE_NAME LIKE 'F%'";
         table = connection.createStatement().executeQuery(query);
 
+        //iterate for tables
         while (table.next()) {
             tableName = table.getString("TABLE_NAME");
+            
+            //initialize script piece many used for all the code
             String scriptPiece = "";
 
+            //query the columns (names and data)
             query = "SELECT * FROM " + tableName;
             tuple = connection.createStatement().executeQuery(query);
             metadata = tuple.getMetaData();
-            int pk = pkStatus(tableName);
+            
+            //status of primary key (simple or compound)
+            int pk = getPKStatus(tableName);
 
             //iterate in tuples
             while (tuple.next()) {
@@ -126,9 +146,10 @@ public class DBFunctionalities {
                 //maximum index of columns
                 int count = metadata.getColumnCount();
 
-                //initialize script piece
+                //initialize a script line
                 scriptPiece += "db." + tableName + ".insert({_id:{";
 
+                //initialize many used flags
                 boolean hasBlob = false;
                 boolean hasQM = false;
                 boolean a, b, c, d, n;
@@ -177,6 +198,7 @@ public class DBFunctionalities {
                     scriptPiece += "}"; //pk == 1 closeand continue
                 }
 
+                //for tables with many columns
                 currentColumn++;
                 if (count > 3) {
                     for (column = currentColumn; column < count; column++) {
@@ -277,11 +299,17 @@ public class DBFunctionalities {
                 }
             } //end of tuple iteration
 
+            //append the created script line
             script.append(scriptPiece);
         } //end of table iteration
     }
 
-    public int pkStatus(String tableName) {
+    /**
+     * This method queries the primary key status
+     * @param tableName the table name
+     * @return theprimary key status (1-simple 2-compound)
+     */
+    public int getPKStatus(String tableName) {
         ResultSet rs = null;
         String query = "SELECT MAX(POSITION) AS MAXIMO FROM USER_CONS_COLUMNS "
                 + "WHERE TABLE_NAME LIKE 'F%' AND CONSTRAINT_NAME LIKE 'PK%' "
@@ -305,7 +333,58 @@ public class DBFunctionalities {
         return position;
     }
 
-    public int fkStatus(String tableName) {
+    /**
+     * This method queries the foreign key constraint name
+     * @param tableName the table name
+     * @return the foreign key constraint name
+     */
+    public String getFKConstraintName(String tableName) {
+        ResultSet result = null;
+        String fkConstraintName = null;
+        String query =  "SELECT CONSTRAINT_NAME FROM USER_CONS_COLUMNS " +
+                        "WHERE TABLE_NAME = '" + tableName + "' " +
+                        "AND CONSTRAINT_NAME LIKE 'FK%' " +
+                        "GROUP BY CONSTRAINT_NAME";
+        try {
+            result = connection.createStatement().executeQuery(query);
+            result.next();
+            fkConstraintName = result.getString("CONSTRAINT_NAME");
+        } catch (SQLException ex) {
+            System.out.println("Error trying to get foreign key constraint name");
+        }
+        
+        return fkConstraintName;
+    }
+    
+    /**
+     * This method queries the foreign key column name
+     * @param tableName the table name
+     * @return the foreign key column name
+     */
+    public String getFKConstraintColumnName(String tableName) {
+        ResultSet result = null;
+        String fkConstraintColumnName = null;
+        String query =  "SELECT COLUMN_NAME FROM USER_CONS_COLUMNS " +
+                        "WHERE TABLE_NAME = '" + tableName + "' " +
+                        "AND CONSTRAINT_NAME LIKE 'FK%'";
+        
+        try {
+            result = connection.createStatement().executeQuery(query);
+            result.next();
+            fkConstraintColumnName = result.getString("CONSTRAINT_NAME");
+        } catch (SQLException ex) {
+            System.out.println("Error trying to get foreign key constraint column name");
+        }
+        
+        return fkConstraintColumnName;
+    }
+
+    /**
+     * This method queries the foreign key status
+     * @param tableName the table name
+     * @return the foreign key status (1-simple 2-compound)
+     */
+    public int getFKStatus(String tableName) {
         ResultSet rs = null;
         String query = "SELECT MAX(POSITION) FROM USER_CONS_COLUMNS "
                 + "WHERE TABLE_NAME LIKE 'F%' AND CONSTRAINT_NAME LIKE 'FK%' "
@@ -327,50 +406,16 @@ public class DBFunctionalities {
         return position;
     }
 
-    boolean isVarchar(ResultSetMetaData md, int column) {
-        int type = 0;
-        try {
-            type = md.getColumnType(column);
-        } catch (SQLException ex) {
-            System.out.println("Error trying to get column type");
-        }
-        return (type == Types.VARCHAR);
-    }
-
-    boolean isChar(ResultSetMetaData md, int column) {
-        int type = 0;
-        try {
-            type = md.getColumnType(column);
-        } catch (SQLException ex) {
-            System.out.println("Error trying to get column type");
-        }
-        return (type == Types.CHAR);
-    }
-
-    boolean isNumber(ResultSetMetaData md, int column) {
-        int type = 0;
-        try {
-            type = md.getColumnType(column);
-        } catch (SQLException ex) {
-            System.out.println("Error trying to get column type");
-        }
-        return (type == Types.INTEGER);
-    }
-
-    boolean isDate(ResultSetMetaData md, int column) {
-        int type = 0;
-        try {
-            type = md.getColumnType(column);
-        } catch (SQLException ex) {
-            System.out.println("Error trying to get column type");
-        }
-        return (type == Types.DATE);
-    }
-
+    /**
+     * Thismethod shows the script
+     */
     public void showScript() {
         System.out.println(script.toString());
     }
 
+    /**
+     * This method saves the script in a text file (with .js extension)
+     */
     public void saveScript() {
         try (PrintWriter out = new PrintWriter("FUT.js")) {
             out.println("//This is a simple BSON script");
