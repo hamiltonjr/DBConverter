@@ -110,204 +110,242 @@ public class DBFunctionalities {
     }
 
     /**
-     * This method do the conversion of Oracle database to the same database
-     * in MongoDB.
-     * @throws SQLException 
+     * This method do the conversion of Oracle database to the same database in
+     * MongoDB.
      */
-    public void convertToMongoDB() throws SQLException {
+    public void convertToMongoDB() {
 
-        //do the table manes query
-        String tableName = null;
-        String query = null;
-        query = "SELECT TABLE_NAME FROM USER_TABLES "
-                + "WHERE TABLE_NAME LIKE 'F%'";
-        table = connection.createStatement().executeQuery(query);
-
-        //iterate for tables
-        while (table.next()) {
-            tableName = table.getString("TABLE_NAME");
-            
+        try {
             //initialize script piece many used for all the code
             String scriptPiece = "";
 
-            //query the columns (names and data)
-            query = "SELECT * FROM " + tableName;
-            tuple = connection.createStatement().executeQuery(query);
-            metadata = tuple.getMetaData();
-            
-            //status of primary key (simple or compound)
-            int pk = getPKStatus(tableName);
+            //do the table manes query
+            String tableName = null;
+            String query = null;
+            query = "SELECT TABLE_NAME FROM USER_TABLES "
+                    + "WHERE TABLE_NAME LIKE 'F%'";
+            table = connection.createStatement().executeQuery(query);
 
-            //iterate in tuples
-            while (tuple.next()) {
-                int column = 1;
-                int currentColumn = 0;
+            //iterate for tables
+            while (table.next()) {
+                tableName = table.getString("TABLE_NAME");
 
-                //maximum index of columns
-                int count = metadata.getColumnCount();
+                //query the columns (names and data)
+                query = "SELECT * FROM " + tableName;
+                tuple = connection.createStatement().executeQuery(query);
+                metadata = tuple.getMetaData();
 
-                //initialize a script line
-                scriptPiece += "db." + tableName + ".insert({_id:{";
+                //status of primary key (simple or compound)
+                int pk = getPKStatus(tableName);
 
-                //initialize many used flags
-                boolean hasBlob = false;
-                boolean hasQM = false;
-                boolean a, b, c, d, n;
+                //iterate in tuples
+                while (tuple.next()) {
+                    //bad code
+                    String key = tuple.getString(1);
+                    if (tableName.equals("F04_TIME")) {
+                        String q = "SELECT * FROM F04_TIME WHERE TTIME = '" + key + "'";
+                        ResultSet timeRS = connection.createStatement().executeQuery(q);
+                        timeRS.next();
+                        String sp = "db.F04_TIME.insert({_id:{ttime:'" + timeRS.getString("TTIME") + "'}, anofundacao:"
+                                + timeRS.getInt("ANOFUNDACAO") + ", FK_TIME_CIDADE:{cidade:'"
+                                + timeRS.getString("CIDADE") + "', siglac:'"
+                                + timeRS.getString("ESTADO") + "'}, cpft:"
+                                + timeRS.getInt("CPFT") + "});\n";
+                        script.append(sp);
+                    } else if (tableName.equals("F09_ESTADIO")) {
+                        String q = "SELECT * FROM F09_ESTADIO WHERE IDESTADIO = " + key;
+                        ResultSet estadioRS = connection.createStatement().executeQuery(q);
+                        estadioRS.next();
+                        String sp = "db.F09_ESTADIO.insert({_id:{idestadio:"
+                                + estadioRS.getInt("IDESTADIO") + "}, estadio:'"
+                                + estadioRS.getString("ESTADIO") + "', FK_CIDADE_ESTADO:{cidade:'"
+                                + estadioRS.getString("CIDADE") + "', siglac:'"
+                                + estadioRS.getString("ESTADO") + "'}, capacidade:"
+                                + estadioRS.getInt("CAPACIDADE") + "});\n";
+                        script.append(sp);
+                    //end of bad code
+                    } else {
 
-                //first column always present
-                scriptPiece += metadata.getColumnName(1).toLowerCase() + ":";
-                a = metadata.getColumnType(1) == Types.VARCHAR;
-                b = metadata.getColumnType(1) == Types.BLOB;
-                c = metadata.getColumnType(1) == Types.CHAR;
-                d = metadata.getColumnType(1) == Types.DATE;
-                n = metadata.getColumnType(1) == Types.NUMERIC;
+                        int column = 1;
+                        int currentColumn = 0;
 
-                hasQM = a || c || d; //has quotation mark
-                hasBlob = b;
+                        //maximum index of columns
+                        int count = metadata.getColumnCount();
 
-                String data = tuple.getString(1);
-                if (hasQM) {
-                    data = "'" + data + "'";
-                }
+                        //initialize a script line
+                        scriptPiece = "db." + tableName + ".insert({_id:{";
 
-                scriptPiece += data;
-                currentColumn = 1;
+                        //initialize many used flags
+                        boolean hasBlob = false;
+                        boolean hasQM = false;
+                        boolean a, b, c, d, n;
 
-                //if primary key is compound
-                if (pk == 2) {
-                    //ṕut second column
-                    scriptPiece += ", ";
-                    scriptPiece += metadata.getColumnName(2).toLowerCase() + ":";
-                    a = metadata.getColumnType(2) == Types.VARCHAR;
-                    b = metadata.getColumnType(2) == Types.BLOB;
-                    c = metadata.getColumnType(2) == Types.CHAR;
-                    d = metadata.getColumnType(2) == Types.DATE;
-                    n = metadata.getColumnType(2) == Types.NUMERIC;
-
-                    hasQM = a || c || d; //has quotation mark
-                    hasBlob = hasBlob || b;
-
-                    data = tuple.getString(2);
-                    if (hasQM) {
-                        data = "'" + data + "'";
-                    }
-                    scriptPiece += data;
-                    scriptPiece += "}"; //always close
-                    currentColumn = 2;
-                } else {
-                    scriptPiece += "}"; //pk == 1 closeand continue
-                }
-
-                //for tables with many columns
-                currentColumn++;
-                if (count > 3) {
-                    for (column = currentColumn; column < count; column++) {
-                        scriptPiece += ", " + metadata.getColumnName(column).toLowerCase() + ":";
-                        a = metadata.getColumnType(column) == Types.VARCHAR;
-                        b = metadata.getColumnType(column) == Types.BLOB;
-                        c = metadata.getColumnType(column) == Types.CHAR;
-                        d = metadata.getColumnType(column) == Types.DATE;
-                        n = metadata.getColumnType(column) == Types.NUMERIC;
+                        //first column always present
+                        scriptPiece += metadata.getColumnName(1).toLowerCase() + ":";
+                        a = metadata.getColumnType(1) == Types.VARCHAR;
+                        b = metadata.getColumnType(1) == Types.BLOB;
+                        c = metadata.getColumnType(1) == Types.CHAR;
+                        d = metadata.getColumnType(1) == Types.DATE;
+                        n = metadata.getColumnType(1) == Types.NUMERIC;
 
                         hasQM = a || c || d; //has quotation mark
-                        hasBlob = hasBlob || b;
+                        hasBlob = b;
 
-                        data = tuple.getString(column);
+                        String data = tuple.getString(1);
+
                         if (hasQM) {
                             data = "'" + data + "'";
                         }
+
                         scriptPiece += data;
-                    }
+                        currentColumn = 1;
 
-                    //last column
-                    scriptPiece += ", " + metadata.getColumnName(count).toLowerCase() + ":";
-                    a = metadata.getColumnType(count) == Types.VARCHAR;
-                    b = metadata.getColumnType(count) == Types.BLOB;
-                    c = metadata.getColumnType(count) == Types.CHAR;
-                    d = metadata.getColumnType(count) == Types.DATE;
-                    n = metadata.getColumnType(count) == Types.NUMERIC;
-
-                    hasQM = a || c || d; //has quotation mark
-                    hasBlob = hasBlob || b;
-
-                    data = tuple.getString(count);
-                    if (hasQM) {
-                        data = "'" + data + "'";
-                    }
-                    scriptPiece += data + "}";
-
-                } else if (count == 3) {
-                    if (pk == 1) {
-                        for (column = currentColumn; column < count; column++) {
-                            scriptPiece += ", " + metadata.getColumnName(column).toLowerCase() + ":";
-                            a = metadata.getColumnType(column) == Types.VARCHAR;
-                            b = metadata.getColumnType(column) == Types.BLOB;
-                            c = metadata.getColumnType(column) == Types.CHAR;
-                            d = metadata.getColumnType(column) == Types.DATE;
-                            n = metadata.getColumnType(column) == Types.NUMERIC;
+                        //if primary key is compound
+                        if (pk == 2) {
+                            //ṕut second column
+                            scriptPiece += ", ";
+                            scriptPiece += metadata.getColumnName(2).toLowerCase() + ":";
+                            a = metadata.getColumnType(2) == Types.VARCHAR;
+                            b = metadata.getColumnType(2) == Types.BLOB;
+                            c = metadata.getColumnType(2) == Types.CHAR;
+                            d = metadata.getColumnType(2) == Types.DATE;
+                            n = metadata.getColumnType(2) == Types.NUMERIC;
 
                             hasQM = a || c || d; //has quotation mark
                             hasBlob = hasBlob || b;
 
-                            data = tuple.getString(column);
+                            data = tuple.getString(2);
+
                             if (hasQM) {
                                 data = "'" + data + "'";
                             }
                             scriptPiece += data;
+                            scriptPiece += "}"; //always close
+                            currentColumn = 2;
+                        } else {
+                            scriptPiece += "}"; //pk == 1 closeand continue
                         }
-                    }
 
-                    //last column
-                    scriptPiece += ", " + metadata.getColumnName(count).toLowerCase() + ":";
-                    a = metadata.getColumnType(count) == Types.VARCHAR;
-                    b = metadata.getColumnType(count) == Types.BLOB;
-                    c = metadata.getColumnType(count) == Types.CHAR;
-                    d = metadata.getColumnType(count) == Types.DATE;
-                    n = metadata.getColumnType(count) == Types.NUMERIC;
+                        //for tables with many columns
+                        currentColumn++;
+                        if (count > 3) {
 
-                    hasQM = a || c || d; //has quotation mark
-                    hasBlob = hasBlob || b;
+                            for (column = currentColumn; column < count; column++) {
+                                scriptPiece += ", " + metadata.getColumnName(column).toLowerCase() + ":";
+                                a = metadata.getColumnType(column) == Types.VARCHAR;
+                                b = metadata.getColumnType(column) == Types.BLOB;
+                                c = metadata.getColumnType(column) == Types.CHAR;
+                                d = metadata.getColumnType(column) == Types.DATE;
+                                n = metadata.getColumnType(column) == Types.NUMERIC;
 
-                    data = tuple.getString(count);
-                    if (hasQM) {
-                        data = "'" + data + "'";
-                    }
-                    scriptPiece += data + "}";
+                                hasQM = a || c || d; //has quotation mark
+                                hasBlob = hasBlob || b;
 
-                } else if (pk == 1) {
-                    //last column
-                    scriptPiece += ", " + metadata.getColumnName(count).toLowerCase() + ":";
-                    a = metadata.getColumnType(count) == Types.VARCHAR;
-                    b = metadata.getColumnType(count) == Types.BLOB;
-                    c = metadata.getColumnType(count) == Types.CHAR;
-                    d = metadata.getColumnType(count) == Types.DATE;
-                    n = metadata.getColumnType(count) == Types.NUMERIC;
+                                data = tuple.getString(column);
+                                if (hasQM) {
+                                    data = "'" + data + "'";
+                                }
+                                scriptPiece += data;
+                            }
 
-                    hasQM = a || c || d; //has quotation mark
-                    hasBlob = hasBlob || b;
+                            //last column
+                            scriptPiece += ", " + metadata.getColumnName(count).toLowerCase() + ":";
+                            a = metadata.getColumnType(count) == Types.VARCHAR;
+                            b = metadata.getColumnType(count) == Types.BLOB;
+                            c = metadata.getColumnType(count) == Types.CHAR;
+                            d = metadata.getColumnType(count) == Types.DATE;
+                            n = metadata.getColumnType(count) == Types.NUMERIC;
 
-                    data = tuple.getString(count);
-                    if (hasQM) {
-                        data = "'" + data + "'";
-                    }
-                    scriptPiece += data + "}";
-                }
+                            hasQM = a || c || d; //has quotation mark
+                            hasBlob = hasBlob || b;
 
-                scriptPiece += ");\n";
-                if (hasBlob) {
-                    scriptPiece += "//BLOB detected and no implemented!\n";
-                }
-            } //end of tuple iteration
+                            data = tuple.getString(count);
+                            if (hasQM) {
+                                data = "'" + data + "'";
+                            }
+                            scriptPiece += data + "}";
 
-            //append the created script line
-            script.append(scriptPiece);
-        } //end of table iteration
+                        } else if (count == 3) {
+                            if (pk == 1) {
+                                for (column = currentColumn; column < count; column++) {
+                                    scriptPiece += ", " + metadata.getColumnName(column).toLowerCase() + ":";
+                                    a = metadata.getColumnType(column) == Types.VARCHAR;
+                                    b = metadata.getColumnType(column) == Types.BLOB;
+                                    c = metadata.getColumnType(column) == Types.CHAR;
+                                    d = metadata.getColumnType(column) == Types.DATE;
+                                    n = metadata.getColumnType(column) == Types.NUMERIC;
+
+                                    hasQM = a || c || d; //has quotation mark
+                                    hasBlob = hasBlob || b;
+
+                                    data = tuple.getString(column);
+                                    if (hasQM) {
+                                        data = "'" + data + "'";
+                                    }
+                                    scriptPiece += data;
+                                }
+                            }
+
+                            //last column
+                            scriptPiece += ", " + metadata.getColumnName(count).toLowerCase() + ":";
+                            a = metadata.getColumnType(count) == Types.VARCHAR;
+                            b = metadata.getColumnType(count) == Types.BLOB;
+                            c = metadata.getColumnType(count) == Types.CHAR;
+                            d = metadata.getColumnType(count) == Types.DATE;
+                            n = metadata.getColumnType(count) == Types.NUMERIC;
+
+                            hasQM = a || c || d; //has quotation mark
+                            hasBlob = hasBlob || b;
+
+                            data = tuple.getString(count);
+                            if (hasQM) {
+                                data = "'" + data + "'";
+                            }
+                            scriptPiece += data + "}";
+
+                        } else if (pk == 1) {
+                            //last column
+                            scriptPiece += ", " + metadata.getColumnName(count).toLowerCase() + ":";
+                            a = metadata.getColumnType(count) == Types.VARCHAR;
+                            b = metadata.getColumnType(count) == Types.BLOB;
+                            c = metadata.getColumnType(count) == Types.CHAR;
+                            d = metadata.getColumnType(count) == Types.DATE;
+                            n = metadata.getColumnType(count) == Types.NUMERIC;
+
+                            hasQM = a || c || d; //has quotation mark
+                            hasBlob = hasBlob || b;
+
+                            data = tuple.getString(count);
+                            if (hasQM) {
+                                data = "'" + data + "'";
+                            }
+                            scriptPiece += data + "}";
+                        }
+
+                        scriptPiece += ");\n";
+                        if (hasBlob) {
+                            scriptPiece += "//BLOB detected and no implemented!\n";
+                        }
+
+                        //append the created script line
+                        script.append(scriptPiece);
+
+                    } //end of tuple iteration
+
+                } //end of table iteration
+            }
+
+        } catch (SQLException ex) {
+            System.out.println("Error trying to convert database");
+        }
+
     }
 
     /**
      * This method queries the primary key status
+     *
      * @param tableName the table name
-     * @return theprimary key status (1-simple 2-compound)
+     * @return the primary key status (1-simple 2-compound)
      */
     public int getPKStatus(String tableName) {
         ResultSet rs = null;
@@ -335,16 +373,17 @@ public class DBFunctionalities {
 
     /**
      * This method queries the foreign key constraint name
+     *
      * @param tableName the table name
      * @return the foreign key constraint name
      */
     public String getFKConstraintName(String tableName) {
         ResultSet result = null;
         String fkConstraintName = null;
-        String query =  "SELECT CONSTRAINT_NAME FROM USER_CONS_COLUMNS " +
-                        "WHERE TABLE_NAME = '" + tableName + "' " +
-                        "AND CONSTRAINT_NAME LIKE 'FK%' " +
-                        "GROUP BY CONSTRAINT_NAME";
+        String query = "SELECT CONSTRAINT_NAME FROM USER_CONS_COLUMNS "
+                + "WHERE TABLE_NAME = '" + tableName + "' "
+                + "AND CONSTRAINT_NAME LIKE 'FK%' "
+                + "GROUP BY CONSTRAINT_NAME";
         try {
             result = connection.createStatement().executeQuery(query);
             result.next();
@@ -352,22 +391,23 @@ public class DBFunctionalities {
         } catch (SQLException ex) {
             System.out.println("Error trying to get foreign key constraint name");
         }
-        
+
         return fkConstraintName;
     }
-    
+
     /**
      * This method queries the foreign key column name
+     *
      * @param tableName the table name
      * @return the foreign key column name
      */
     public String getFKConstraintColumnName(String tableName) {
         ResultSet result = null;
         String fkConstraintColumnName = null;
-        String query =  "SELECT COLUMN_NAME FROM USER_CONS_COLUMNS " +
-                        "WHERE TABLE_NAME = '" + tableName + "' " +
-                        "AND CONSTRAINT_NAME LIKE 'FK%'";
-        
+        String query = "SELECT COLUMN_NAME FROM USER_CONS_COLUMNS "
+                + "WHERE TABLE_NAME = '" + tableName + "' "
+                + "AND CONSTRAINT_NAME LIKE 'FK%'";
+
         try {
             result = connection.createStatement().executeQuery(query);
             result.next();
@@ -375,35 +415,8 @@ public class DBFunctionalities {
         } catch (SQLException ex) {
             System.out.println("Error trying to get foreign key constraint column name");
         }
-        
+
         return fkConstraintColumnName;
-    }
-
-    /**
-     * This method queries the foreign key status
-     * @param tableName the table name
-     * @return the foreign key status (1-simple 2-compound)
-     */
-    public int getFKStatus(String tableName) {
-        ResultSet rs = null;
-        String query = "SELECT MAX(POSITION) FROM USER_CONS_COLUMNS "
-                + "WHERE TABLE_NAME LIKE 'F%' AND CONSTRAINT_NAME LIKE 'FK%' "
-                + "AND TABLE_NAME = '" + tableName + "' "
-                + "GROUP BY TABLE_NAME";
-        try {
-            rs = connection.createStatement().executeQuery(query);
-        } catch (SQLException ex) {
-            System.out.println("Error trying to get primary key result set");
-        }
-
-        int position = 0;
-        try {
-            position = rs.getInt("MAX(POSITION)");
-        } catch (SQLException ex) {
-            System.out.println("Error trying to get key type");
-        }
-
-        return position;
     }
 
     /**
